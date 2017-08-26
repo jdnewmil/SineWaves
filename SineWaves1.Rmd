@@ -1,0 +1,376 @@
+---
+title: "Sine Waves"
+output: html_notebook
+---
+
+# Pure Sine Wave
+
+Let's make a sine wave sound object, one second long, 440Hz:
+
+```{r}
+library(tuneR)
+setWavPlayer( "play" )
+
+f1 <- 440 # Hz
+fs <- 44100 # Hz, typical compact disk sample rate
+wave1 <- sine( freq = f1
+             , duration = 1
+             , from = 0
+             , samp.rate = fs
+             , stereo = FALSE
+             , xunit = "time"
+             )
+```
+
+We can try to plot it:
+
+```{r}
+plot(wave1)
+```
+
+but there are too many cycles (440) in one second long duration to see what is happening. Lets try to look at the first 400 samples:
+
+```{r}
+plot( wave1@left[ 1:440 ] )
+```
+
+This shows that we do actually have a sine wave in the left stereo channel, but R doesn't know how to scale the x-axis. If each sample is 1/44100 seconds apart, then we can just multiply a counting sequence corresponding to all 44100 samples by that amount of time to get time values corresponding to each sample:
+
+```{r}
+tm <- ( 0:44099 ) * 1/44100
+plot( tm[ 1:400 ], wave1@left[ 1:400 ] )
+```
+
+Notice that the sine wave ranges from -1 to 1... this is standard for the mathematical sine wave function, but you need to realize that the computer speaker is connected to a digital-to-analog converter that has a maximum amplitude that isn't "1" but is usually some number measured in volts or amps and the sound player software recognizes that and "stretches" the amplitude so that -1 to +1 corresponds to the limits of the D/A converter.
+
+```{r}
+play( wave1 )
+```
+
+Lets see what happens when the sine wave has a smaller amplitude:
+
+```{r}
+wave2 <- wave1
+wave2@left <- wave2@left / 10
+plot( tm[ 1:400 ], wave2@left[ 1:400 ] )
+```
+
+The vertical size of the wave is one-tenth as big as it was. Listen:
+
+```{r}
+play( wave2 )
+```
+
+Smaller amplitude means quieter!
+
+What about a different sine wave frequency?
+
+```{r}
+f3 <- 880 # Hz
+wave3 <- sine( freq = f3
+             , duration = 1
+             , from = 0
+             , samp.rate = fs
+             , stereo = FALSE
+             , xunit = "time"
+             )
+plot( tm[ 1:400 ], wave3@left[ 1:400 ] )
+```
+
+More waves squeezed into the same time interval. Listen:
+
+```{r}
+play( wave3 )
+```
+
+Frequency corresponds to pitch!
+
+# 2 Serial Sine Waves
+
+Can we make part of the wave at one frequency and the other part at a second frequency?
+
+```{r}
+wave4 <- bind( sine( freq = f1
+                   , duration = 1
+                   , from = 0
+                   , samp.rate = fs
+                   , stereo = FALSE
+                   , xunit = "time"
+                   )
+             , sine( freq = f3
+                   , duration = 1
+                   , from = 0
+                   , samp.rate = fs
+                   , stereo = FALSE
+                   , xunit = "time"
+                   )
+             )
+show( wave4 )
+```
+
+Again, too many cycles up and down to see them individually, but can see the amplitude (1) and duration (2s):
+
+```{r}
+plot( wave4 )
+```
+
+Looking just at the transition around 1 second:
+
+```{r}
+tm4 <- ( 0:88200 ) * 1/44100
+plot( extractWave( wave4, from = 43901, to = 44300 ) )
+```
+
+```{r}
+play( wave4 )
+```
+
+Notice that both frequencies have the same amplitude, but the higher frequency sounds louder. This is because the human ear is more receptive to frequencies closer to 3000Hz than higher or lower.
+
+Since the frequency changes over time, lets look at the data in short intervals:
+
+```{r}
+pergm4 <- periodogram( wave4, width = 2048 )
+pergm4
+```
+
+Setting the width to 2048 means that chunks of data 2048 points long (`r 2048/fs * 1000` milliseconds) are pulled out and separately analyzed for frequency content. Here is what the first piece looks like:
+
+```{r}
+plot( extractWave( wave4, from = 1, to = 2048 ) )
+```
+
+Notice that it doesn't end up at the same level at the end as it started out (0), so if you imagine this piece repeating over and over indefinitely there would be little jumps every so often, like this:
+
+```{r}
+wave4a <- extractWave( wave4, from = 1, to = 2048 )
+wave4b <- bind( wave4a, wave4a )
+plot( wave4b )
+```
+
+This jump is what causes the peak to "spread out" with more frequencies:
+
+```{r}
+plot( pergm4, xlim=c( 0, 1000 ), which = 1 )
+```
+
+Also notice that because the length of each chunk of data is fairly short, the information about the frequency content is spread out... in fact, the interval between extracted frequencies is $\Delta f = \frac{1}{T}$ where $T$ is the duration of the short burst of sound we extracted... $T$ is `r 2048/fs * 1000` milliseconds, so $\Delta f = `r fs/2048` Hz$, which might seem kind of coarse. It is kind of coarse, but the trade-off is that now we can see how the frequency changes over time:
+
+```{r}
+image( pergm4, ylim = c( 0, 1000 ) )
+```
+
+The `tuneR` package helps you extract the key frequencies from the spectrum:
+
+```{r}
+ff4 <- FF( pergm4 )
+ff4
+```
+
+Each number represents the highest amplitude frequency for the corresponding block of 2048 data points.  The 22nd block shifts frequencies abruptly, which confuses the algorithms.
+
+```{r}
+plot( ff4 )
+```
+
+However, we can compare the found frequencies with musical note standard frequencies, where the tuning-fork A (440Hz) is 0, and one octave up is 12 half-steps up:
+
+```{r}
+nff4 <- noteFromFF( ff4 )
+nff4
+```
+
+Finally, this function produces a plot that presents both notes played and loudness together. Notice the very narrow range of amplitudes represented in the "energy" band at the bottom, which makes the small variations look important.
+
+```{r}
+melodyplot( pergm4, noteFromFF( FF( pergm4 ) ) )
+```
+
+
+# 2 Added (Mixed) Sine Waves
+
+What if we try to play the sine waves at the same time?
+
+```{r}
+wave5 <- ( sine(440)+sine(880) ) / 2
+plot( tm[ 1:400 ], wave5@left[ 1:400 ] )
+```
+
+Each cycle is looking a bit lopsided, high at the beginning, low at the end.
+
+```{r}
+play( wave5 )
+```
+
+```{r}
+plot( periodogram( wave1 ) )
+```
+
+The one spike in the frequency plot shows up at 440Hz for the `wave1` waveform.
+
+```{r}
+plot( periodogram( wave5 ) )
+```
+
+For the `wave5` waveform, spikes appear at both 440Hz and 880Hz. Note that even though the two sine waves were generated with the same magnitude, the spikes in the periodogram are not equal due to numerical rounding error. Fortunately we can see the important bit that the funny lopsided waveform was originally made up of two sine waves.
+
+# A bunch of added sine waves
+
+```{r}
+sine6 <- (  sine( 440 ) + sine( 880 )/2 + sine( 1240 )/3 + sine( 1760 )/4 + sine( 2200 )/5 ) / 2
+plot( tm[ 1:400 ], sine6@left[ 1:400 ] )
+```
+
+```{r}
+plot( periodogram( sine6 ) )
+```
+
+It seems like we can combine sine waves to make quite a few different waveforms... in fact, an engineer named Fourier figured out in the nineteenth century that you could make any repeating waveform you wanted if you just added together enough sine waves.
+
+```{r}
+play( sine6 )
+```
+
+# A triangle wave
+
+So if any repeating waveform can be split up into many sine waves, what about a waveform made up of straight lines?
+
+```{r}
+tm3 <- ( 0:65535 ) / fs
+wave7 <- Wave( 1 - abs( ( tm3 %% (1/f1) ) - 0.5 / f1 ) * 4 * f1
+             , samp.rate = fs
+             , bit = 32
+             , pcm = FALSE
+             )
+plot( tm[ 1:400 ], wave7@left[ 1:400 ] )
+```
+
+If we look at it as frequencies:
+
+```{r}
+plot( periodogram( wave7 ), xlim=c( 0, 3000 ) )
+```
+
+The magnitude at 440Hz is much larger than the magnitude at 1260Hz. We can use a trick that makes large numbers look smaller and small numbers look larger:
+
+```{r}
+x1 <- c( 0.1, 1, 10, 100, 1000 )
+log10( x1 )
+```
+
+Basically the logarithm figures out what power you would have to take a base (10 in the above example) to in order to get the desired number. That is, 
+
+$$
+100 = 10^2 \rightarrow \log_{10}{100}=2
+$$
+
+We know that 10 is closer to 1 than 100 is closer to 10, yet when we look at the logarithms we are comparing 1 to 0 and 2 compared to 1, which makes those differences seem like the same size.
+
+If we apply the logarithm to the y-axis we can see what is happening to the small numbers more clearly:
+
+```{r}
+pergm7 <- periodogram( wave7 )
+plot( pergm7, xlim=c( 0, 3000 ), log="y" )
+```
+
+This graph is showing that not only are there sine waves with frequencies $f=440 \cdot (2n-1)$ being added together, but there are sine waves with frequencies in between. It turns out that a mathematical proof can show that the perfect triangle wave does not have those "in-between" sine waves, so this "noise" information appears because computers cannot represent an infinitely long sine wave and they cannot represent real numbers absolutely perfectly (always rounded off just a little). 
+
+```{r}
+library(dplyr)
+DF <- data.frame( freq = pergm7@freq
+                , spec = pergm7@spec[[ 1 ]]
+                )
+DF <- arrange( DF, desc( spec ) )
+head( DF, 12 )
+```
+
+Notice that the highest magnitude at 440Hz is 0.93 and at 1320Hz is 0.0074 (over 100 times smaller).
+
+Lets listen to the sine wave and the triangle wave:
+
+```{r}
+play( bind( wave1, wave7 ) )
+```
+
+The triangle wave sounds more... rich... (complicated?) because it actually has "overtones".  The exact mix of overtones in a waveform is what makes a guitar sound different than a trumpet or a cello.
+
+# Clipping
+
+As mentioned above, a computer's sound output has limits that it cannot exceed... if you try to put out a larger amplitude than it is capable of converting, it will "max out" the waveform (clip), creating a new waveform that sounds different (distorted) from the intended waveform.
+
+## 50% Clip
+
+If we double the amplitude:
+
+```{r}
+wave8a <- wave1
+wave8a@left <- wave8a@left * 2
+plot( tm[ 1:400 ], wave8a@left[ 1:400 ] )
+```
+
+And then clip it off so it does not exceed a magnitude of 1:
+
+```{r}
+wave8b <- wave8a
+wave8b@left <- ifelse( 0.99 < abs( wave8a@left )
+                     , 0.99 * sign( wave8a@left )
+                     , wave8a@left
+                     )
+plot( tm[ 1:400 ], wave8b@left[ 1:400 ] )
+```
+
+```{r}
+play( bind( wave1, wave8b ) )
+```
+
+```{r}
+pergm8b <- periodogram( wave8b )
+plot( pergm8b, xlim = c( 0, 3000 ), log="y" )
+```
+
+```{r}
+DF <- data.frame( freq = pergm8b@freq
+                , spec = pergm8b@spec[[ 1 ]]
+                )
+DF <- arrange( DF, desc( spec ) )
+head( DF, 12 )
+```
+
+For this waveform, the highest magnitude at 440Hz is 0.62, and at 1320Hz it is 0.026, a factor of about 20, so the overtones in this case are about 5 times larger (in a relative sense) than for the triangle wave.
+
+## 25% Clip
+
+```{r}
+wave9a <- wave1
+wave9a@left <- wave9a@left * 4/3
+plot( tm[ 1:400 ], wave9a@left[ 1:400 ] )
+```
+
+```{r}
+wave9b <- wave9a
+wave9b@left <- ifelse( 0.99 < abs( wave9a@left )
+                     , 0.99 * sign( wave9a@left )
+                     , wave9a@left
+                     )
+plot( tm[ 1:400 ], wave9b@left[ 1:400 ] )
+```
+
+```{r}
+play( bind( wave1, wave9b ) )
+```
+
+```{r}
+pergm9b <- periodogram( wave9b )
+plot( pergm9b, xlim = c( 0, 3000 ), log="y" )
+```
+
+```{r}
+DF <- data.frame( freq = pergm9b@freq
+                , spec = pergm9b@spec[[ 1 ]]
+                )
+DF <- arrange( DF, desc( spec ) )
+head( DF, 12 )
+```
+
+Here the 440Hz fundamental is 0.65 and the second harmonic at 1320Hz is 0.0067, which, like the triangle wave is a factor of about 100. That is, the harmonics are much smaller relative to the fundamental when clipping off 25% of the amplitude than when clipping off 50% of the amplitude.
+
