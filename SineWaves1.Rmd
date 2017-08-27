@@ -158,7 +158,7 @@ plot( pergm4, xlim=c( 0, 1000 ), which = 1 )
 Also notice that because the length of each chunk of data is fairly short, the information about the frequency content is spread out... in fact, the interval between extracted frequencies is $\Delta f = \frac{1}{T}$ where $T$ is the duration of the short burst of sound we extracted... $T$ is `r 2048/fs * 1000` milliseconds, so $\Delta f = `r fs/2048` Hz$, which might seem kind of coarse. It is kind of coarse, but the trade-off is that now we can see how the frequency changes over time:
 
 ```{r}
-image( pergm4, ylim = c( 0, 1000 ), xunit="time")
+image( pergm4, ylim = c( 0, 1000 ), xunit="time", col=terrain.colors( 12 ) )
 ```
 
 In summary, there is a trade-off in how finely spaced the frequencies will be where you can estimate amplitude, and how finely spaced you can be in identifying the time at which changes occur. The longer the chunk of data used for examining frequency is, the more closely the frequency values are spaced, but the longer in time it will be between seeing changes.
@@ -303,7 +303,7 @@ The triangle wave sounds more... rich... (complicated?) because it actually has 
 
 ```{r}
 pergm7a <- periodogram( wave7a, width = 2048 )
-image( pergm7a, ylim = c( 0, 1000 ), xunit = "time" )
+image( pergm7a, ylim = c( 0, 1000 ), xunit = "time", col=terrain.colors( 12 ) )
 ```
 
 
@@ -389,6 +389,10 @@ Here the 440Hz fundamental is 0.65 and the second harmonic at 1320Hz is 0.0067, 
 
 # Guitar Sample 1
 
+A couple of chords and single notes were recorded. We consider how they sound as recorded and with simulated clipping.
+
+## As-is
+
 ```{r}
 wave10 <- mono( readWave( "data/guitar1.wav" ), "left" )
 play( wave10 )
@@ -405,11 +409,11 @@ plot( extractWave( wave10, from = 4 * 2048 + 1, to = 5 * 2048))
 
 ```{r}
 pergm10 <- periodogram( wave10, width = 2048, overlap = 0.5 )
-plot( pergm10, xlim = c( 0, 2000 ), log="y" )
+plot( pergm10, xlim = c( 0, 4000 ), log="y" )
 ```
 
 ```{r}
-image( pergm10, ylim = c( 0, 2000 ), xunit="time" )
+image( pergm10, ylim = c( 0, 2000 ), xunit="time", col=terrain.colors( 12 ) )
 ```
 
 ```{r}
@@ -421,4 +425,39 @@ ff10
 nff10 <- noteFromFF( ff10 )
 melodyplot( pergm10, nff10 )
 ```
+## Clipped
 
+```{r}
+wave10a <- wave10
+wave10a@left <- ifelse( abs( wave10a@left ) < 0.33
+                      , wave10a@left
+                      , 0.33 * sign( wave10a@left ) 
+                      )
+plot( extractWave( wave10a, from = 4 * 2048 + 1, to = 5 * 2048))
+
+```
+
+```{r}
+play( bind( wave10, wave10a ) )
+```
+
+The added "noise" comes from the clipping. The most common place for clipping to occur is when the input signal amplitude to the sound input device is too large for the device to convert, and it saturates the analog-to-digital converter. However, it can also occur with an analog amplifier because they all have amplitude limits as well. Since sound analog signals are often passed through pre-amplifiers and then amplifiers before reaching the A/D converter, the pre-amp can be over-driven and then the regular amp may reduce the amplitude such that the amplitude as seen by the computer may not always be near the computer maximum.
+
+```{r}
+pergm10a <- periodogram( wave10a, width = 2048, overlap = 0.5 )
+par( mfrow=c( 1, 2 ) )
+plot( pergm10a, xlim = c( 0, 4000 ), log="y", which=4, main="Clipped" )
+paleRed <- adjustcolor( "red", alpha.f = 0.3 )
+plot( pergm10, xlim = c( 0, 4000 ), log="y", col="red", which = 4, main="As-is" )
+
+```
+
+We can see that the clipped version has many more intermediate frequencies in the overtones, while the as-is version is much more selective about which overtones are emphasized.
+
+```{r}
+par( mfrow=c( 1, 2 ) )
+image( pergm10, ylim = c( 0, 1200 ), xunit="time", col=terrain.colors( 12 ), main="As-is" )
+image( pergm10a, ylim = c( 0, 1200 ), xunit="time", col=terrain.colors( 12 ), main="Clipped" )
+```
+
+The spectrogram resolution here is a bit too coarse to see the little spikes in between the main frequencies.
