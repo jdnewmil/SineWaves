@@ -1,7 +1,7 @@
 ---
 title: "Sine Waves"
 author: "Jeff Newmiller"
-date: "26-AUG-2017"
+date: "27-AUG-2017"
 output: html_notebook
 ---
 
