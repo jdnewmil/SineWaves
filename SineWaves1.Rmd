@@ -222,18 +222,18 @@ For the `wave5` waveform, spikes appear at both 440Hz and 880Hz. Note that even 
 # A bunch of added sine waves
 
 ```{r}
-sine6 <- (  sine( 440 ) + sine( 880 )/2 + sine( 1240 )/3 + sine( 1760 )/4 + sine( 2200 )/5 ) / 2
-plot( extractWave( sine6, from = 1, to = 400 ) )
+wave6 <- (  sine( 440 ) + sine( 880 )/2 + sine( 1240 )/3 + sine( 1760 )/4 + sine( 2200 )/5 ) / 2
+plot( extractWave( wave6, from = 1, to = 400 ) )
 ```
 
 ```{r}
-plot( periodogram( sine6 ) )
+plot( periodogram( wave6 ) )
 ```
 
 It seems like we can combine sine waves to make quite a few different waveforms... in fact, an engineer named Fourier figured out in the nineteenth century that you could make any repeating waveform you wanted if you just added together enough sine waves.
 
 ```{r}
-play( sine6 )
+play( wave6 )
 ```
 
 # A triangle wave
@@ -247,7 +247,7 @@ wave7 <- Wave( 1 - abs( ( tm3 %% (1/f1) ) - 0.5 / f1 ) * 4 * f1
              , bit = 32
              , pcm = FALSE
              )
-plot( tm[ 1:400 ], wave7@left[ 1:400 ] )
+plot( extractWave( wave7, from = 1, to = 400 ) )
 ```
 
 If we look at it as frequencies:
@@ -447,9 +447,7 @@ The added "noise" comes from the clipping. The most common place for clipping to
 pergm10a <- periodogram( wave10a, width = 2048, overlap = 0.5 )
 par( mfrow=c( 1, 2 ) )
 plot( pergm10a, xlim = c( 0, 4000 ), log="y", which=4, main="Clipped" )
-paleRed <- adjustcolor( "red", alpha.f = 0.3 )
 plot( pergm10, xlim = c( 0, 4000 ), log="y", col="red", which = 4, main="As-is" )
-
 ```
 
 We can see that the clipped version has many more intermediate frequencies in the overtones, while the as-is version is much more selective about which overtones are emphasized.
